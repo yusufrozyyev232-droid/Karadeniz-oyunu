@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+    <title>Karadeniz Chaos Pro Max v5.2.0</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Tone/14.8.49/Tone.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #020617;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+            position: fixed;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #020617;
+        }
+
+        canvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .yayla-glow {
+            text-shadow: 0 0 15px rgba(34, 197, 94, 0.9), 0 0 30px rgba(234, 179, 8, 0.8);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(52, 211, 153, 0.4);
+        }
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 12px;
+            height: 12px;
+            margin-left: -6px;
+            margin-top: -6px;
+            border: 2px solid rgba(52, 211, 153, 0.9);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 20;
+            box-shadow: 0 0 10px rgba(52, 211, 153, 0.8);
+        }
+        .mother-bubble {
+            animation: bounceIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.8) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .swing-anim {
+            animation: slashSword 0.18s ease-in-out;
+        }
+        @keyframes slashSword {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(-45deg) scale(1.1); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-white">
+    <div id="game-container">
+
+        <div class="crosshair"></div>
+
+        <div class="absolute top-3 right-3 z-40 flex items-center gap-2">
+            <button onclick="setGlobalLanguage('tr')" class="px-2.5 py-1.5 bg-emerald-700 text-white rounded-lg text-xs font-bold border border-emerald-400 cursor-pointer shadow-lg active:scale-95 transition">TR 🇹🇷</button>
+            <button onclick="setGlobalLanguage('fr')" class="px-2.5 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold border border-slate-600 cursor-pointer shadow-lg active:scale-95 transition">FR 🇫🇷</button>
+        </div>
+
+        <div id="cinematic-screen" class="absolute inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center p-6 text-center transition-opacity duration-1000 overflow-y-auto">
+            <div class="glass-panel p-8 sm:p-10 rounded-3xl max-w-xl w-full shadow-2xl border-2 border-emerald-500/50 my-auto">
+                <h1 id="ui-title" class="text-2xl sm:text-4xl font-black text-emerald-400 mb-3 yayla-glow">KARADENİZ YAYLASI PRO MAX v5.2.0 ⛰️</h1>
+                <p id="ui-desc" class="text-slate-300 text-sm sm:text-base mb-6 leading-relaxed">
+                    "Kurtlar ve geyikler kamp ateşinden ve el feneri ışığından kaçar! Gündüzleri geyikler güneşten korkup gelmez, gece ortaya çıkar."
+                </p>
+                <div class="flex gap-4 justify-center">
+                    <button onclick="startActiveGameSession()" id="ui-start-btn" class="px-8 py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-sm sm:text-base rounded-2xl shadow-2xl border border-emerald-300 active:scale-95 transition cursor-pointer pointer-events-auto">
+                        YAYLAYA ÇIK (BAŞLA) 🚀
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MOTHER MERYEM HUD -->
+        <div id="mother-hud" class="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden transition-all duration-300 mother-bubble w-11/12 max-w-md">
+            <div class="glass-panel px-5 py-3 rounded-2xl border-2 border-amber-500/80 shadow-2xl flex items-center gap-3">
+                <span class="text-3xl">🧕</span>
+                <div>
+                    <div class="text-[10px] text-amber-400 font-black tracking-widest uppercase">ANNE MERYEM (SESLİ):</div>
+                    <div id="mother-text" class="text-xs sm:text-sm font-bold text-slate-100">"Uşağum ateşin ve fenerin ışığı kurtları korkutiyi!"</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GIANT DEER HEALTH BAR -->
+        <div id="deer-hud" class="absolute top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-none hidden w-11/12 max-w-xs">
+            <div class="glass-panel p-2.5 rounded-xl border border-rose-500 text-center shadow-xl">
+                <div class="text-[10px] font-black text-rose-400 mb-1">🦌 DEV BOYNUZLU GEYİK SÜRÜSÜ (CAN)</div>
+                <div class="w-full bg-slate-900 h-3 rounded-full overflow-hidden border border-slate-700">
+                    <div id="deer-hp-bar" class="bg-gradient-to-r from-rose-600 to-amber-500 h-full w-full transition-all duration-200"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="hud" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-3 sm:p-6 z-10 hidden overflow-hidden pb-12 sm:pb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start gap-2 pt-1">
+                <div class="glass-panel p-3 rounded-2xl shadow-2xl pointer-events-auto flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 via-green-600 to-amber-500 flex items-center justify-center font-black text-base shadow-lg border border-emerald-400">🦌</div>
+                    <div>
+                        <div class="text-[9px] text-emerald-400 font-black tracking-widest uppercase">YAYLA MODU v5.2</div>
+                        <div class="text-xs font-bold text-slate-100"><span id="lbl-can">Can</span>: <span id="hp-val" class="text-emerald-400 font-extrabold">100</span>% | <span id="lbl-enerji">Enerji</span>: <span id="stamina-val" class="text-blue-400 font-extrabold">100</span>%</div>
+                        <div class="text-[10px] text-amber-400 font-black"><span id="lbl-skor">Skor</span>: <span id="score-val" class="text-amber-400 font-extrabold">0</span> | <span id="lbl-saat">SAAT</span>: <span id="clock-val" class="text-cyan-300">08:00</span> | ⚔️ <span id="lbl-silah">SİLAH</span>: <span id="weapon-display" class="text-emerald-400">KILIÇ</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-panel p-2 rounded-2xl pointer-events-auto flex gap-1.5 items-center flex-wrap justify-start sm:justify-end max-w-lg">
+                    <button onclick="game.toggleMusic()" id="btn-music" class="px-2.5 py-1 rounded-xl bg-purple-600 font-black text-[11px] border border-purple-300 transition shadow-lg flex items-center gap-1 cursor-pointer active:scale-95">
+                        🎶 <span id="lbl-muzik">MÜZİK</span>: <span id="music-state">KAPALI</span>
+                    </button>
+                    <button onclick="game.toggleCameraView()" id="btn-camera" class="px-2.5 py-1 rounded-xl bg-cyan-600 font-black text-[11px] border border-cyan-300 transition shadow-lg flex items-center gap-1 cursor-pointer active:scale-95">
+                        🎥 <span id="lbl-kamera">AÇI</span>: <span id="camera-state">1. ŞAHIS</span>
+                    </button>
+                    <button onclick="game.toggleWeapon()" id="btn-weapon" class="px-2.5 py-1 rounded-xl bg-emerald-600 font-black text-[11px] border border-emerald-300 transition shadow-lg flex items-center gap-1 cursor-pointer active:scale-95">
+                        ⚔️ <span id="lbl-degistir">DEĞİŞTİR</span>
+                    </button>
+                    <button onclick="game.sleepInBed()" id="btn-sleep" class="px-2.5 py-1 rounded-xl bg-indigo-600 font-black text-[11px] border border-indigo-300 transition shadow-lg flex items-center gap-1 cursor-pointer active:scale-95">
+                        🛏️ <span id="lbl-uyku">UYU</span>
+                    </button>
+                    <button onclick="game.smashVase()" class="px-2.5 py-1 rounded-xl bg-rose-600 font-black text-[11px] border border-rose-300 transition shadow-lg flex items-center gap-1 animate-pulse cursor-pointer active:scale-95">
+                        🏺 <span id="lbl-vazo">VAZO</span>
+                    </button>
+                    <button onclick="game.toggleFlashlight()" id="btn-flashlight" class="px-2.5 py-1 rounded-xl bg-amber-600 font-black text-[11px] border border-amber-300 transition shadow-lg flex items-center gap-1 cursor-pointer active:scale-95">
+                        🔦 <span id="lbl-fener">FENER</span>
+                    </button>
+                    <button onclick="game.toggleInventory()" class="px-2.5 py-1 rounded-xl bg-emerald-600 font-black text-[11px] border border-emerald-400 transition shadow-lg cursor-pointer active:scale-95">
+                        🎒 <span id="lbl-cuval">ÇUVAL</span> (<span id="sack-count">0</span>/15)
+                    </button>
+                </div>
+            </div>
+
+            <div class="glass-panel p-2.5 rounded-2xl pointer-events-auto w-64 max-w-full ml-auto shadow-2xl border border-amber-500/50 flex flex-col gap-1">
+                <div class="flex justify-between items-center text-[10px] font-black text-amber-400">
+                    <span>💬 ANNE MERYEM SOHBET</span>
+                </div>
+                <div id="chat-messages" class="h-12 overflow-y-auto bg-slate-900/80 p-1.5 rounded-xl text-[11px] space-y-1 text-slate-200 border border-slate-800">
+                    <div><span class="text-amber-400 font-bold">Anne:</span> "Uşağum fenerini aç, kurtlar kaçsun!"</div>
+                </div>
+                <div class="flex gap-1">
+                    <input type="text" id="chat-input" placeholder="Annenize seslenin..." class="flex-1 bg-slate-900 border border-slate-700 px-2 py-1 rounded-xl text-[11px] text-white focus:outline-none focus:border-amber-500">
+                    <button onclick="sendMotherChat()" class="px-2.5 py-1 bg-gradient-to-r from-amber-600 to-yellow-600 rounded-xl font-black text-[11px] shadow-lg active:scale-95 transition border border-amber-300 cursor-pointer">
+                        KONUŞ 🗣️
+                    </button>
+                </div>
+            </div>
+
+            <div id="notification" class="self-center text-center px-5 py-1.5 bg-gradient-to-r from-emerald-700 via-green-600 to-amber-600 text-white font-black text-xs rounded-2xl shadow-2xl transition-all duration-300 opacity-0 scale-95 pointer-events-none border border-white/40">
+                YAYLA MODU AKTİF!
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-between items-center sm:items-end pointer-events-auto w-full pb-14 sm:pb-8 gap-2">
+                <div class="glass-panel p-2 rounded-2xl shadow-2xl flex items-center gap-1.5">
+                    <button onclick="game.chopWood()" class="px-2.5 py-1.5 bg-gradient-to-r from-amber-700 to-yellow-600 active:scale-95 transition rounded-xl font-black text-[10px] shadow-xl border border-amber-300 flex flex-col items-center cursor-pointer">
+                        <span class="text-xs">🪓</span>
+                        <span id="lbl-odun" class="mt-0.5">KES</span>
+                    </button>
+                    <button onclick="game.buildHouse()" class="px-2.5 py-1.5 bg-gradient-to-r from-emerald-700 to-teal-600 active:scale-95 transition rounded-xl font-black text-[10px] shadow-xl border border-emerald-300 flex flex-col items-center cursor-pointer">
+                        <span class="text-xs">🏠</span>
+                        <span id="lbl-ev" class="mt-0.5">EV (5)</span>
+                    </button>
+                    <button onclick="game.upgradeCampfire()" class="px-2.5 py-1.5 bg-gradient-to-r from-orange-600 to-rose-600 active:scale-95 transition rounded-xl font-black text-[10px] shadow-xl border border-orange-300 flex flex-col items-center cursor-pointer">
+                        <span class="text-xs">🔥</span>
+                        <span id="lbl-ates" class="mt-0.5">ATEŞ (10)</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2.5 w-full sm:w-auto justify-between sm:justify-end">
+                    <div id="joystick-base" class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900/90 border-2 border-emerald-400 relative flex items-center justify-center shadow-2xl touch-none cursor-grab shrink-0 mb-4 sm:mb-0">
+                        <div id="joystick-thumb" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 absolute shadow-lg border border-emerald-200 pointer-events-none transition-transform duration-75"></div>
+                        <span id="lbl-yuru" class="absolute text-[7px] font-black text-emerald-400 pointer-events-none tracking-widest uppercase">YÜRÜ</span>
+                    </div>
+
+                    <div class="flex gap-1.5 shrink-0 mb-4 sm:mb-0 flex-wrap max-w-[280px]">
+                        <button onclick="game.playerAttackAction()" id="btn-attack" class="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-rose-600 to-amber-600 active:scale-95 transition rounded-xl border border-rose-300/70 flex flex-col items-center justify-center shadow-xl font-black cursor-pointer animate-pulse">
+                            <span class="text-sm" id="btn-icon">⚔️</span>
+                            <span id="lbl-action" class="text-[7px]">SALLA</span>
+                        </button>
+                        <button onclick="game.toggleRun()" id="btn-run" class="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 active:scale-95 transition rounded-xl border border-blue-300/70 flex flex-col items-center justify-center shadow-xl font-black cursor-pointer">
+                            <span class="text-sm">🏃</span>
+                            <span id="lbl-kos" class="text-[7px]">KOŞ</span>
+                        </button>
+                        <button onclick="game.toggleHoron()" class="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-purple-600 to-indigo-600 active:scale-95 transition rounded-xl border border-purple-300/70 flex flex-col items-center justify-center shadow-xl font-black cursor-pointer">
+                            <span class="text-sm">💃</span>
+                            <span id="lbl-horon" class="text-[7px]">HORON</span>
+                        </button>
+                        <button onclick="game.playerJump()" class="w-11 h-11 sm:w-12 sm:h-12 bg-gradient-to-tr from-amber-600 to-green-600 active:scale-95 transition rounded-xl border border-green-300/70 flex flex-col items-center justify-center shadow-xl font-black cursor-pointer">
+                            <span class="text-sm">🦘</span>
+                            <span id="lbl-zipla" class="text-[7px]">ZIPLA</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="inventory-modal" class="absolute inset-0 bg-slate-950/80 backdrop-blur-md z-40 flex items-center justify-center hidden p-4">
+            <div class="glass-panel p-6 rounded-3xl w-96 max-w-full shadow-2xl border-2 border-emerald-500 flex flex-col max-h-[85vh]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="lbl-cuval-baslik" class="text-base font-black text-emerald-400 yayla-glow">🎒 KARADENİZ ÇUVALI</h2>
+                    <button onclick="game.toggleInventory()" class="text-slate-400 hover:text-white font-bold text-lg cursor-pointer">✕</button>
+                </div>
+                <div class="text-xs text-slate-300 mb-3">Odun: <span id="inv-wood-val" class="text-amber-400 font-bold">0</span> / 15</div>
+                
+                <div id="inventory-items" class="grid grid-cols-2 gap-2 overflow-y-auto pr-1 mb-4 flex-1">
+                </div>
+
+                <button onclick="game.toggleInventory()" id="lbl-kapat" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-black text-xs rounded-xl shadow-xl border border-emerald-300 cursor-pointer">
+                    KAPAT
+                </button>
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="absolute inset-0 bg-slate-950/95 z-50 flex flex-col items-center justify-center hidden p-4">
+            <div class="glass-panel p-8 rounded-3xl text-center shadow-2xl border-2 border-rose-500 max-w-md w-full">
+                <h1 id="lbl-gameover-title" class="text-2xl sm:text-3xl font-black text-rose-500 mb-3 yayla-glow">KURTLAR YAKALADI!</h1>
+                <p id="lbl-gameover-desc" class="text-slate-300 text-xs sm:text-sm mb-5">"Işıktan uzaklaştın veya feneri kapattın!"</p>
+                <div class="text-amber-400 font-bold text-base mb-6"><span id="lbl-final-skor">Skor</span>: <span id="final-score">0</span></div>
+                <button onclick="restartGame()" id="lbl-tekrar" class="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-green-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-xl border border-emerald-300 active:scale-95 transition cursor-pointer">
+                    TEKRAR BAŞLA ⛰️
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const i18n = {
+            tr: {
+                title: "KARADENİZ YAYLASI PRO MAX v5.2.0 ⛰️",
+                desc: "Kurtlar ve geyikler ışıktan (ateş ve el feneri) kaçar. Geyikler gündüz güneşten kaçar, gece gelir!",
+                startBtn: "YAYLAYA ÇIK (BAŞLA) 🚀",
+                can: "Can",
+                enerji: "Enerji",
+                skor: "Skor",
+                saat: "SAAT",
+                silah: "SİLAH",
+                fener: "FENER",
+                cuval: "ÇUVAL",
+                vazo: "VAZO",
+                uyku: "UYU",
+                odunKes: "KES",
+                evKur: "EV (5)",
+                atesBuyut: "ATEŞ (10)",
+                yuru: "YÜRÜ",
+                kilic: "KILIÇ",
+                kos: "KOŞ",
+                zipla: "ZIPLA",
+                horon: "HORON",
+                muzik: "MÜZİK",
+                birinci: "1. ŞAHIS",
+                ucuncu: "3. ŞAHIS",
+                cuvalBaslik: "🎒 KARADENİZ ÇUVALI",
+                kapat: "KAPAT",
+                gameoverTitle: "KURTLAR YAKALADI!",
+                gameoverDesc: "Ateşten ve fenerden uzaklaştın!",
+                finalSkor: "Skor",
+                tekrar: "TEKRAR BAŞLA ⛰️",
+                notifVase: "🏺 Meryem Ana'nın vazosunu kırdın!",
+                notifSleep: "🛏️ Yatakta huzurla uyudun!",
+                notifEv: "🏠 Yayla evi kuruldu!",
+                notifEvErr: "❌ Ev kurmak için 5 odun lazım!",
+                notifOdun: "🪓 Odun eklendi:",
+                notifOdunMax: "🎒 Çuval dolu!",
+                notifCampfire: "🔥 Kamp ateşi büyütüldü!",
+                notifCampfireErr: "❌ Ateşi büyütmek için 10 odun lazım!",
+                notifSpawn: "🦌 Gece oldu! Boynuzlu Dev Geyik Sürüsü yaylaya indi!",
+                notifDeerHit: "💥 Geyik isabet aldı! Can:",
+                notifDeerDead: "🎉 Dev Boynuzlu Geyik Sürüsü Alt Edildi! 5000 Puan!",
+                notifHoron: "💃 Horon tepmeye başladın!",
+                notifHoronEnd: "Horon bitti.",
+                notifWeapon: "⚔️ Silah değiştirildi:"
+            },
+            fr: {
+                title: "PLATEAU DE LA MER NOIRE PRO MAX v5.2.0 ⛰️",
+                desc: "Les loups et cerfs craignent la lumière (feu et lampe de poche).",
+                startBtn: "COMMENCER 🚀",
+                can: "PV",
+                enerji: "Énergie",
+                skor: "Score",
+                saat: "HEURE",
+                silah: "ARME",
+                fener: "LAMPE",
+                cuval: "SAC",
+                vazo: "VASE",
+                uyku: "DORMIR",
+                odunKes: "BOIS",
+                evKur: "MAISON (5)",
+                atesBuyut: "FEU (10)",
+                yuru: "MARCHER",
+                kos: "COURIR",
+                zipla: "SAUTER",
+                horon: "DANSER",
+                muzik: "MUSIQUE",
+                birinci: "1ère",
+                ucuncu: "3e",
+                cuvalBaslik: "🎒 SAC",
+                kapat: "FERMER",
+                gameoverTitle: "LES LOUPS VOUS ONT ATTRAPÉ !",
+                gameoverDesc: "Vous avez quitté la lumière !",
+                finalSkor: "Score",
+                tekrar: "RECOMMENCER ⛰️",
+                notifVase: "🏺 Vase cassé !",
+                notifSleep: "🛏️ Bien dormi !",
+                notifEv: "🏠 Maison construite !",
+                notifEvErr: "❌ Pas assez de bois !",
+                notifOdun: "🪓 Bois ajouté :",
+                notifOdunMax: "🎒 Sac plein !",
+                notifCampfire: "🔥 Feu agrandi !",
+                notifCampfireErr: "❌ Pas assez de bois !",
+                notifSpawn: "🦌 La nuit tombe ! Meute de cerfs apparue !",
+                notifDeerHit: "💥 Cerf touché ! PV:",
+                notifDeerDead: "🎉 Cerfs vaincus !",
+                notifHoron: "💃 Horon !",
+                notifHoronEnd: "Fin de danse.",
+                notifWeapon: "⚔️ Arme changée :"
+            }
+        };
+
+        let scene, renderer;
+        let game = null;
+
+        function speakMother(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = game && game.currentLang === 'fr' ? 'fr-FR' : 'tr-TR';
+                utterance.pitch = 0.9;
+                utterance.rate = 1.05;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function setGlobalLanguage(lang) {
+            if (game) game.setLanguage(lang);
+        }
+
+        function startActiveGameSession() {
+            if (game) {
+                game.startActiveGame();
+            }
+        }
+
+        function sendMotherChat() {
+            const input = document.getElementById('chat-input');
+            const txt = input.value.trim();
+            if (!txt) return;
+
+            const chatContainer = document.getElementById('chat-messages');
+            chatContainer.innerHTML += `<div><span class="text-cyan-400 font-bold">Sen:</span> "${txt}"</div>`;
+            input.value = '';
+
+            let reply = "Uşağum ateşini yak ve fenerini açık tut!";
+            const lower = txt.toLowerCase();
+            
+            if (lower.includes('salak') || lower.includes('kes') || lower.includes('sus')) {
+                reply = "Al o sopayı kafana!";
+                if (game) {
+                    game.motherAnger = 3;
+                    game.isMotherChasing = true;
+                }
+                showNotification("😡 Meryem Ana sinirlendi!", "bg-rose-700");
+            } else if (lower.includes('kork') || lower.includes('kurt')) {
+                reply = "Korkma, ateş ve el feneri ışığı onları kaçırıyi!";
+            } else if (lower.includes('anne')) {
+                reply = "Efendim uşağum?";
+            }
+
+            setTimeout(() => {
+                chatContainer.innerHTML += `<div><span class="text-amber-400 font-bold">Anne:</span> "${reply}"</div>`;
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+                triggerMotherQuote(reply);
+            }, 500);
+        }
+
+        class Game3D {
+            constructor() {
+                this.currentLang = 'tr';
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x0284c7);
+                this.scene.fog = new THREE.FogExp2(0x0284c7, 0.012);
+
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.shadowMap.enabled = true;
+                
+                const container = document.getElementById('game-container');
+                container.appendChild(this.renderer.domElement);
+
+                this.worldSize = 1000;
+                this.player = {
+                    x: 0, z: 5, y: 2,
+                    hp: 100,
+                    stamina: 100,
+                    maxStamina: 100,
+                    score: 0,
+                    wood: 0,
+                    maxWood: 15,
+                    jumpVal: 0,
+                    isJumping: false,
+                    flashlightOn: false,
+                    battery: 100,
+                    currentWeapon: 'KILIÇ',
+                    ammo: 30,
+                    cameraView: 'FIRST',
+                    isHoroning: false,
+                    isRunning: false,
+                    inventory: [
+                        { icon: "⚔️", name: "Kılıç (Sınırsız)", qty: 1 },
+                        { icon: "🔫", name: "AK-47", qty: 1 },
+                        { icon: "🪓", name: "Balta", qty: 1 },
+                        { icon: "🧃", name: "Meyve Suyu", qty: 3 },
+                        { icon: "🥖", name: "Ekmek", qty: 5 },
+                        { icon: "🔦", name: "Fener", qty: 1 },
+                        { icon: "💊", name: "İlk Yardım", qty: 2 },
+                        { icon: "🥩", name: "Et", qty: 4 },
+                        { icon: "🍄", name: "Mantar", qty: 6 },
+                        { icon: "💰", name: "Altın", qty: 15 }
+                    ]
+                };
+
+                this.cameraAngleX = 0; 
+                this.cameraAngleY = 0; 
+                this.moveVector = { x: 0, z: 0 }; 
+
+                this.inGameTime = 8.0; 
+                this.timeSpeed = 0.002;
+                this.isGameStarted = false;
+                this.isMusicPlaying = false;
+
+                this.houses = []; 
+                this.campfires = [];
+                this.projectiles = [];
+                this.wolves = [];
+                this.birds = [];
+
+                this.mother = null;
+                this.motherAnger = 0;
+                this.isMotherChasing = false;
+
+                this.deerHorde = [];
+                this.isDeerSpawned = false;
+                this.deerHp = 800;
+                this.maxDeerHp = 800;
+
+                this.playerAvatar = null;
+                this.swordMesh = null;
+                this.ak47Mesh = null;
+                this.moonMesh = null;
+
+                this.initToneSynth();
+                this.initLights();
+                this.initTerrain();
+                this.initEnvironment();
+                this.initBirds();
+                this.initPlayerAvatar();
+                this.initWeaponMeshes();
+                this.initMotherMeryem();
+                this.initWolves();
+                this.initInitialCampfire();
+                this.initControls();
+
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            startActiveGame() {
+                this.isGameStarted = true;
+                const cinematic = document.getElementById('cinematic-screen');
+                if (cinematic) {
+                    cinematic.style.opacity = '0';
+                    cinematic.style.pointerEvents = 'none';
+                    setTimeout(() => cinematic.remove(), 600);
+                }
+                const hud = document.getElementById('hud');
+                if (hud) hud.classList.remove('hidden');
+                triggerMotherQuote("Uşağum yaylaya ateş başında hoş geldin! Fenerini açık tut, kurtlar ışıktan kaçar.");
+                if (this.synth) {
+                    try { Tone.start(); } catch(e) {}
+                }
+            }
+
+            initToneSynth() {
+                try {
+                    this.synth = new Tone.Synth().toDestination();
+                    this.musicLoop = new Tone.Loop(time => {
+                        if (!this.isMusicPlaying) return;
+                        const notes = ["C4", "E4", "G4", "B4", "C5", "G4", "E4"];
+                        const note = notes[Math.floor(Math.random() * notes.length)];
+                        this.synth.triggerAttackRelease(note, "8n", time);
+                    }, "4n");
+
+                    this.birdLoop = new Tone.Loop(time => {
+                        if (!this.isGameStarted) return;
+                        if (this.inGameTime >= 6.0 && this.inGameTime < 19.0) {
+                            const birdNotes = ["A5", "C6", "E6", "B5"];
+                            const bNote = birdNotes[Math.floor(Math.random() * birdNotes.length)];
+                            if (this.synth) this.synth.triggerAttackRelease(bNote, "16n", time);
+                        }
+                    }, "2n");
+                } catch(e) {}
+            }
+
+            toggleMusic() {
+                this.isMusicPlaying = !this.isMusicPlaying;
+                if (this.isMusicPlaying) {
+                    Tone.start();
+                    Tone.Transport.start();
+                    if (this.musicLoop) this.musicLoop.start(0);
+                    if (this.birdLoop) this.birdLoop.start(0);
+                    document.getElementById('music-state').innerText = (this.currentLang === 'tr' ? 'AÇIK' : 'ON');
+                    showNotification("🎶 Müzik ve Kuş Sesleri Açıldı!", "bg-purple-600");
+                } else {
+                    if (this.musicLoop) this.musicLoop.stop();
+                    if (this.birdLoop) this.birdLoop.stop();
+                    document.getElementById('music-state').innerText = (this.currentLang === 'tr' ? 'KAPALI' : 'OFF');
+                    showNotification("Müzik Kapatıldı.", "bg-slate-700");
+                }
+            }
+
+            toggleCameraView() {
+                const d = i18n[this.currentLang];
+                if (this.player.cameraView === 'FIRST') {
+                    this.player.cameraView = 'THIRD';
+                    document.getElementById('camera-state').innerText = d.ucuncu;
+                    if (this.playerAvatar) this.playerAvatar.visible = true;
+                    if (this.swordMesh) this.swordMesh.visible = false;
+                    if (this.ak47Mesh) this.ak47Mesh.visible = false;
+                } else {
+                    this.player.cameraView = 'FIRST';
+                    document.getElementById('camera-state').innerText = d.birinci;
+                    if (this.playerAvatar) this.playerAvatar.visible = false;
+                    if (this.player.currentWeapon === 'KILIÇ') {
+                        if (this.swordMesh) this.swordMesh.visible = true;
+                    } else {
+                        if (this.ak47Mesh) this.ak47Mesh.visible = true;
+                    }
+                }
+            }
+
+            toggleWeapon() {
+                const d = i18n[this.currentLang];
+                if (this.player.currentWeapon === 'KILIÇ') {
+                    this.player.currentWeapon = 'AK-47';
+                    document.getElementById('weapon-display').innerText = 'AK-47';
+                    document.getElementById('btn-icon').innerText = '🔫';
+                    if (this.swordMesh) this.swordMesh.visible = false;
+                    if (this.ak47Mesh && this.player.cameraView === 'FIRST') this.ak47Mesh.visible = true;
+                } else {
+                    this.player.currentWeapon = 'KILIÇ';
+                    document.getElementById('weapon-display').innerText = d.kilic;
+                    document.getElementById('btn-icon').innerText = '⚔️';
+                    if (this.ak47Mesh) this.ak47Mesh.visible = false;
+                    if (this.swordMesh && this.player.cameraView === 'FIRST') this.swordMesh.visible = true;
+                }
+                showNotification(`${d.notifWeapon} ${this.player.currentWeapon}`, "bg-emerald-600");
+            }
+
+            toggleRun() {
+                if (this.player.stamina <= 5) return;
+                this.player.isRunning = !this.player.isRunning;
+                const runBtn = document.getElementById('btn-run');
+                if (this.player.isRunning) {
+                    runBtn.classList.remove('from-blue-600', 'to-indigo-600');
+                    runBtn.classList.add('from-emerald-600', 'to-teal-600');
+                    showNotification("🏃 Koşma Modu Aktif!", "bg-blue-600");
+                } else {
+                    runBtn.classList.remove('from-emerald-600', 'to-teal-600');
+                    runBtn.classList.add('from-blue-600', 'to-indigo-600');
+                    showNotification("🚶 Yürüme Modu", "bg-slate-700");
+                }
+            }
+
+            toggleHoron() {
+                const d = i18n[this.currentLang];
+                this.player.isHoroning = !this.player.isHoroning;
+                if (this.player.isHoroning) {
+                    if (this.player.cameraView === 'FIRST') this.toggleCameraView();
+                    showNotification(d.notifHoron, "bg-purple-700");
+                    if (!this.isMusicPlaying) this.toggleMusic();
+                } else {
+                    showNotification(d.notifHoronEnd, "bg-rose-700");
+                }
+            }
+
+            setLanguage(lang) {
+                this.currentLang = lang;
+                const d = i18n[lang];
+                document.getElementById('ui-title').innerText = d.title;
+                document.getElementById('ui-desc').innerText = d.desc;
+                document.getElementById('ui-start-btn').innerText = d.startBtn;
+                document.getElementById('lbl-can').innerText = d.can;
+                document.getElementById('lbl-enerji').innerText = d.enerji;
+                document.getElementById('lbl-skor').innerText = d.skor;
+                document.getElementById('lbl-saat').innerText = d.saat;
+                document.getElementById('lbl-silah').innerText = d.silah;
+                document.getElementById('lbl-fener').innerText = d.fener;
+                document.getElementById('lbl-cuval').innerText = d.cuval;
+                document.getElementById('lbl-vazo').innerText = d.vazo;
+                document.getElementById('lbl-uyku').innerText = d.uyku;
+                document.getElementById('lbl-odun').innerText = d.odunKes;
+                document.getElementById('lbl-ev').innerText = d.evKur;
+                document.getElementById('lbl-ates').innerText = d.atesBuyut;
+                document.getElementById('lbl-yuru').innerText = d.yuru;
+                document.getElementById('lbl-kos').innerText = d.kos;
+                document.getElementById('lbl-zipla').innerText = d.zipla;
+                document.getElementById('lbl-horon').innerText = d.horon;
+                document.getElementById('lbl-muzik').innerText = d.muzik;
+                document.getElementById('camera-state').innerText = this.player.cameraView === 'FIRST' ? d.birinci : d.ucuncu;
+                document.getElementById('weapon-display').innerText = this.player.currentWeapon === 'KILIÇ' ? d.kilic : 'AK-47';
+                document.getElementById('lbl-cuval-baslik').innerText = d.cuvalBaslik;
+                document.getElementById('lbl-kapat').innerText = d.kapat;
+                document.getElementById('lbl-gameover-title').innerText = d.gameoverTitle;
+                document.getElementById('lbl-gameover-desc').innerText = d.gameoverDesc;
+                document.getElementById('lbl-final-skor').innerText = d.finalSkor;
+                document.getElementById('lbl-tekrar').innerText = d.tekrar;
+            }
+
+            initLights() {
+                this.ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+                this.scene.add(this.ambientLight);
+
+                this.dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+                this.dirLight.position.set(200, 400, 200);
+                this.scene.add(this.dirLight);
+
+                const moonGeo = new THREE.SphereGeometry(15, 16, 16);
+                const moonMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                this.moonMesh = new THREE.Mesh(moonGeo, moonMat);
+                this.moonMesh.position.set(-250, 350, -250);
+                this.moonMesh.visible = false;
+                this.scene.add(this.moonMesh);
+
+                this.flashlight = new THREE.SpotLight(0xffffff, 4.0, 150, Math.PI / 5, 0.4, 1);
+                this.flashlight.position.set(0, 0, 0);
+                this.flashlight.target.position.set(0, 0, -50);
+                this.scene.add(this.flashlight);
+                this.scene.add(this.flashlight.target);
+            }
+
+            initTerrain() {
+                const groundGeo = new THREE.PlaneGeometry(this.worldSize, this.worldSize, 64, 64);
+                const groundMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x15803d, 
+                    roughness: 0.85,
+                    metalness: 0.05
+                });
+                const ground = new THREE.Mesh(groundGeo, groundMat);
+                ground.rotation.x = -Math.PI / 2;
+                this.scene.add(ground);
+            }
+
+            initPlayerAvatar() {
+                const group = new THREE.Group();
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, roughness: 0.4 });
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047, roughness: 0.5 });
+
+                const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 1), bodyMat);
+                body.position.y = 1.25;
+                group.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 8), headMat);
+                head.position.y = 2.8;
+                group.add(head);
+
+                group.position.set(0, 0, 0);
+                group.visible = false;
+                this.scene.add(group);
+                this.playerAvatar = group;
+            }
+
+            initWeaponMeshes() {
+                const swordGroup = new THREE.Group();
+                const bladeMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.9, roughness: 0.1 });
+                const hiltMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6 });
+
+                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.8, 0.04), bladeMat);
+                blade.position.set(0, 0.8, 0);
+                swordGroup.add(blade);
+
+                const hilt = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.1), hiltMat);
+                hilt.position.set(0, -0.1, 0);
+                swordGroup.add(hilt);
+
+                const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8), hiltMat);
+                handle.position.set(0, -0.35, 0);
+                swordGroup.add(handle);
+
+                swordGroup.position.set(0.5, -0.4, -0.8);
+                this.camera.add(swordGroup);
+                this.swordMesh = swordGroup;
+
+                const akGroup = new THREE.Group();
+                const metalMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.3 });
+                const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.7 });
+
+                const stock = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 1.2), woodMat);
+                stock.position.set(0, -0.2, 0.6);
+                akGroup.add(stock);
+
+                const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.35, 1.5), metalMat);
+                receiver.position.set(0, -0.1, -0.2);
+                akGroup.add(receiver);
+
+                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 8), metalMat);
+                barrel.rotation.x = Math.PI / 2;
+                barrel.position.set(0, 0, -1.1);
+                akGroup.add(barrel);
+
+                const mag = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.8, 0.3), metalMat);
+                mag.position.set(0, -0.6, -0.4);
+                mag.rotation.x = -Math.PI / 6;
+                akGroup.add(mag);
+
+                akGroup.position.set(0.4, -0.4, -0.9);
+                akGroup.visible = false;
+                this.camera.add(akGroup);
+                this.ak47Mesh = akGroup;
+
+                this.scene.add(this.camera);
+            }
+
+            initMotherMeryem() {
+                const group = new THREE.Group();
+                const dressMat = new THREE.MeshStandardMaterial({ color: 0x15803d });
+                const headMat = new THREE.MeshStandardMaterial({ color: 0xfde047 });
+                const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f });
+
+                const body = new THREE.Mesh(new THREE.BoxGeometry(2, 3.5, 1.2), dressMat);
+                body.position.y = 1.75;
+                group.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), headMat);
+                head.position.y = 3.8;
+                group.add(head);
+
+                const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4, 8), woodMat);
+                stick.position.set(1.2, 2.2, 0.5);
+                stick.rotation.z = -Math.PI / 6;
+                group.add(stick);
+
+                group.position.set(3, 0, 3);
+                this.scene.add(group);
+                this.mother = { group, x: 3, z: 3, speed: 2.2 };
+            }
+
+            smashVase() {
+                const d = i18n[this.currentLang];
+                this.motherAnger = 1;
+                this.isMotherChasing = true;
+                this.player.score += 500;
+                showNotification(d.notifVase, "bg-rose-700");
+                triggerMotherQuote("Vazomu kırdın uşağum!");
+            }
+
+            initInitialCampfire() {
+                const group = new THREE.Group();
+                const fireLight = new THREE.PointLight(0xf97316, 6.0, 50);
+                fireLight.position.y = 3;
+                group.add(fireLight);
+
+                const flameMesh = new THREE.Mesh(new THREE.ConeGeometry(2.5, 5, 6), new THREE.MeshBasicMaterial({ color: 0xf97316 }));
+                flameMesh.position.y = 2.5;
+                group.add(flameMesh);
+
+                const ringGeo = new THREE.RingGeometry(14, 15, 32);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                ring.position.y = 0.1;
+                group.add(ring);
+
+                group.position.set(0, 0, 0);
+                this.scene.add(group);
+                this.campfires.push({ group, x: 0, z: 0, radius: 18, light: fireLight, ring: ring, level: 1 });
+            }
+
+            upgradeCampfire() {
+                const d = i18n[this.currentLang];
+                if (this.player.wood >= 10) {
+                    this.player.wood -= 10;
+                    document.getElementById('sack-count').innerText = this.player.wood;
+                    
+                    const cf = this.campfires[0];
+                    cf.radius = 40;
+                    cf.light.distance = 100;
+                    cf.light.intensity = 12.0;
+                    
+                    this.scene.remove(cf.ring);
+                    const newRingGeo = new THREE.RingGeometry(38, 40, 32);
+                    const newRingMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+                    cf.ring = new THREE.Mesh(newRingGeo, newRingMat);
+                    cf.ring.rotation.x = -Math.PI / 2;
+                    cf.ring.position.y = 0.1;
+                    cf.group.add(cf.ring);
+
+                    showNotification(d.notifCampfire, "bg-orange-600");
+                } else {
+                    showNotification(d.notifCampfireErr, "bg-rose-700");
+                }
+            }
+
+            initEnvironment() {
+                for (let i = 0; i < 40; i++) {
+                    const tx = (Math.random() - 0.5) * 700;
+                    const tz = (Math.random() - 0.5) * 700;
+                    if (Math.hypot(tx, tz) > 40) {
+                        const treeGroup = new THREE.Group();
+                        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.4, 8, 8), new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.8 }));
+                        trunk.position.y = 4;
+                        treeGroup.add(trunk);
+                        const leaves = new THREE.Mesh(new THREE.ConeGeometry(5, 12, 8), new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.7 }));
+                        leaves.position.y = 12;
+                        treeGroup.add(leaves);
+                        treeGroup.position.set(tx, 0, tz);
+                        this.scene.add(treeGroup);
+                    }
+                }
+            }
+
+            initBirds() {
+                for (let i = 0; i < 8; i++) {
+                    const birdGroup = new THREE.Group();
+                    const wingMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
+                    const leftWing = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 0.6), wingMat);
+                    leftWing.position.set(-1, 0, 0);
+                    birdGroup.add(leftWing);
+                    const rightWing = new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 0.6), wingMat);
+                    rightWing.position.set(1, 0, 0);
+                    birdGroup.add(rightWing);
+
+                    birdGroup.position.set((Math.random() - 0.5) * 400, 80 + Math.random() * 40, (Math.random() - 0.5) * 400);
+                    this.scene.add(birdGroup);
+                    this.birds.push({ group: birdGroup, x: birdGroup.position.x, y: birdGroup.position.y, z: birdGroup.position.z, angle: Math.random() * Math.PI });
+                }
+            }
+
+            initWolves() {
+                for (let i = 0; i < 12; i++) {
+                    const group = new THREE.Group();
+                    const isAlpha = i < 3;
+                    const furMat = new THREE.MeshStandardMaterial({ color: isAlpha ? 0x991b1b : 0x18181b, roughness: 0.9 });
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(isAlpha ? 3.2 : 2.5, isAlpha ? 2.5 : 2, isAlpha ? 6 : 5), furMat);
+                    body.position.y = 1.5;
+                    group.add(body);
+
+                    const angle = (i / 12) * Math.PI * 2;
+                    const wx = Math.cos(angle) * 160;
+                    const wz = Math.sin(angle) * 160;
+                    group.position.set(wx, 0, wz);
+                    this.scene.add(group);
+
+                    this.wolves.push({
+                        group,
+                        x: wx,
+                        z: wz,
+                        speed: isAlpha ? 1.1 : 0.7,
+                        isAlpha: isAlpha
+                    });
+                }
+            }
+
+            spawnGiantDeerHorde() {
+                if (this.isDeerSpawned) return;
+                this.isDeerSpawned = true;
+                const d = i18n[this.currentLang];
+
+                for (let i = 0; i < 5; i++) {
+                    const group = new THREE.Group();
+                    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.6 });
+                    const antlerMat = new THREE.MeshStandardMaterial({ color: 0xfef08a, roughness: 0.3 });
+
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(7, 9, 18), bodyMat);
+                    body.position.y = 9;
+                    group.add(body);
+
+                    const leftAntler = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4, 2), antlerMat);
+                    leftAntler.position.set(1.5, 15, -2);
+                    leftAntler.rotation.z = -Math.PI / 6;
+                    group.add(leftAntler);
+
+                    const rightAntler = new THREE.Mesh(new THREE.BoxGeometry(0.4, 4, 2), antlerMat);
+                    rightAntler.position.set(-1.5, 15, -2);
+                    rightAntler.rotation.z = Math.PI / 6;
+                    group.add(rightAntler);
+
+                    const offsetX = (Math.random() - 0.5) * 40;
+                    const offsetZ = (Math.random() - 0.5) * 40;
+                    group.position.set(120 + offsetX, 0, 120 + offsetZ);
+                    this.scene.add(group);
+
+                    this.deerHorde.push({
+                        group,
+                        x: 120 + offsetX,
+                        z: 120 + offsetZ,
+                        speed: 0.6
+                    });
+                }
+                
+                document.getElementById('deer-hud').classList.remove('hidden');
+                showNotification(d.notifSpawn, "bg-rose-700");
+            }
+
+            initControls() {
+                let isSwiping = false;
+                let startX = 0, startY = 0;
+
+                window.addEventListener('pointerdown', e => {
+                    if (!this.isGameStarted) return;
+                    if (e.target.closest('#hud') || e.target.closest('#inventory-modal') || e.target.closest('#cinematic-screen') || e.target.closest('#game-over-screen')) return;
+                    isSwiping = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                });
+
+                window.addEventListener('pointermove', e => {
+                    if (!this.isGameStarted || !isSwiping) return;
+                    let dx = e.clientX - startX;
+                    let dy = e.clientY - startY;
+                    startX = e.clientX;
+                    startY = e.clientY;
+
+                    this.cameraAngleX += dx * 0.0095; 
+                    this.cameraAngleY -= dy * 0.0095;
+                    this.cameraAngleY = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, this.cameraAngleY));
+                });
+
+                window.addEventListener('pointerup', () => isSwiping = false);
+
+                this.keys = {};
+                window.addEventListener('keydown', e => { if (this.isGameStarted) this.keys[e.code] = true; });
+                window.addEventListener('keyup', e => { if (this.isGameStarted) this.keys[e.code] = false; });
+
+                const joystickBase = document.getElementById('joystick-base');
+                const thumb = document.getElementById('joystick-thumb');
+                let joyTouchId = null;
+                let baseRect = joystickBase.getBoundingClientRect();
+
+                joystickBase.addEventListener('pointerdown', e => {
+                    if (!this.isGameStarted) return;
+                    joyTouchId = e.pointerId;
+                    joystickBase.setPointerCapture(joyTouchId);
+                    baseRect = joystickBase.getBoundingClientRect();
+                    updateJoystick(e.clientX, e.clientY);
+                });
+
+                joystickBase.addEventListener('pointermove', e => {
+                    if (e.pointerId === joyTouchId) updateJoystick(e.clientX, e.clientY);
+                });
+
+                const endJoystick = e => {
+                    if (e.pointerId === joyTouchId) {
+                        joyTouchId = null;
+                        this.moveVector.x = 0;
+                        this.moveVector.z = 0;
+                        thumb.style.transform = `translate(0px, 0px)`;
+                    }
+                };
+                joystickBase.addEventListener('pointerup', endJoystick);
+                joystickBase.addEventListener('pointercancel', endJoystick);
+
+                const updateJoystick = (clientX, clientY) => {
+                    const centerX = baseRect.left + baseRect.width / 2;
+                    const centerY = baseRect.top + baseRect.height / 2;
+                    let dx = clientX - centerX;
+                    let dy = clientY - centerY;
+                    const dist = Math.hypot(dx, dy);
+                    const maxRadius = 30;
+                    if (dist > maxRadius) {
+                        dx = (dx / dist) * maxRadius;
+                        dy = (dy / dist) * maxRadius;
+                    }
+                    thumb.style.transform = `translate(${dx}px, ${dy}px)`;
+                    this.moveVector.x = dx / maxRadius;
+                    this.moveVector.z = dy / maxRadius;
+                };
+            }
+
+            toggleInventory() {
+                const modal = document.getElementById('inventory-modal');
+                modal.classList.toggle('hidden');
+                document.getElementById('inv-wood-val').innerText = this.player.wood;
+                document.getElementById('sack-count').innerText = this.player.wood;
+
+                const container = document.getElementById('inventory-items');
+                container.innerHTML = '';
+                this.player.inventory.forEach(item => {
+                    container.innerHTML += `
+                        <div class="glass-panel p-2.5 rounded-xl border border-slate-700 flex items-center justify-between shadow-md">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xl">${item.icon}</span>
+                                <div>
+                                    <div class="text-xs font-bold text-white">${item.name}</div>
+                                    <div class="text-[9px] text-slate-400">Adet: ${item.qty}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            toggleFlashlight() {
+                this.player.flashlightOn = !this.player.flashlightOn;
+                this.flashlight.intensity = this.player.flashlightOn ? 6.0 : 0.0;
+                showNotification(this.player.flashlightOn ? "🔦 Fener Açıldı" : "🔦 Fener Kapandı", "bg-amber-600");
+            }
+
+            chopWood() {
+                const d = i18n[this.currentLang];
+                if (this.player.wood < this.player.maxWood) {
+                    this.player.wood++;
+                    document.getElementById('sack-count').innerText = this.player.wood;
+                    showNotification(`${d.notifOdun} ${this.player.wood}/15`, "bg-amber-700");
+                } else {
+                    showNotification(d.notifOdunMax, "bg-rose-700");
+                }
+            }
+
+            buildHouse() {
+                const d = i18n[this.currentLang];
+                if (this.player.wood >= 5) {
+                    this.player.wood -= 5;
+                    document.getElementById('sack-count').innerText = this.player.wood;
+
+                    const group = new THREE.Group();
+                    const wallMat = new THREE.MeshStandardMaterial({ color: 0x92400e });
+                    const walls = new THREE.Mesh(new THREE.BoxGeometry(10, 6, 10), wallMat);
+                    walls.position.y = 3;
+                    group.add(walls);
+
+                    const hx = this.player.x + Math.sin(this.cameraAngleX) * 10;
+                    const hz = this.player.z - Math.cos(this.cameraAngleX) * 10;
+                    group.position.set(hx, 0, hz);
+                    this.scene.add(group);
+                    this.houses.push({ group, x: hx, z: hz });
+
+                    showNotification(d.notifEv, "bg-emerald-700");
+                } else {
+                    showNotification(d.notifEvErr, "bg-rose-700");
+                }
+            }
+
+            sleepInBed() {
+                this.player.hp = 100;
+                this.player.stamina = 100;
+                this.inGameTime = 8.0;
+                showNotification(i18n[this.currentLang].notifSleep, "bg-indigo-600");
+            }
+
+            playerJump() {
+                if (!this.player.isJumping) {
+                    this.player.isJumping = true;
+                    this.player.jumpVal = 0.4;
+                }
+            }
+
+            playerAttackAction() {
+                if (this.player.currentWeapon === 'KILIÇ') {
+                    const btn = document.getElementById('btn-attack');
+                    btn.classList.add('swing-anim');
+                    setTimeout(() => btn.classList.remove('swing-anim'), 180);
+
+                    if (this.synth) {
+                        try { this.synth.triggerAttackRelease("G3", "16n"); } catch(e) {}
+                    }
+
+                    for (let w of this.wolves) {
+                        if (Math.hypot(this.player.x - w.x, this.player.z - w.z) < 6) {
+                            w.x += (Math.random() - 0.5) * 12;
+                            w.z += (Math.random() - 0.5) * 12;
+                            showNotification("⚔️ Kılıç Darbesi Kurda İsabetti!", "bg-purple-600");
+                        }
+                    }
+
+                    if (this.isDeerSpawned) {
+                        for (let deer of this.deerHorde) {
+                            if (Math.hypot(this.player.x - deer.x, this.player.z - deer.z) < 8) {
+                                this.deerHp -= 40;
+                                const pct = Math.max(0, (this.deerHp / this.maxDeerHp) * 100);
+                                document.getElementById('deer-hp-bar').style.width = pct + '%';
+                                showNotification(`${i18n[this.currentLang].notifDeerHit} ${this.deerHp}`, "bg-amber-600");
+
+                                if (this.deerHp <= 0) {
+                                    this.deerHorde.forEach(d => this.scene.remove(d.group));
+                                    this.deerHorde = [];
+                                    this.isDeerSpawned = false;
+                                    document.getElementById('deer-hud').classList.add('hidden');
+                                    this.player.score += 5000;
+                                    showNotification(i18n[this.currentLang].notifDeerDead, "bg-emerald-600");
+                                }
+                            }
+                        }
+                    }
+
+                } else {
+                    if (this.player.ammo <= 0) return;
+                    this.player.ammo--;
+
+                    const dir = new THREE.Vector3(Math.sin(this.cameraAngleX), Math.sin(this.cameraAngleY), -Math.cos(this.cameraAngleX)).normalize();
+                    const p = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+                    p.position.set(this.player.x, this.player.y + 0.8, this.player.z);
+                    this.scene.add(p);
+                    this.projectiles.push({ mesh: p, dir, life: 60 });
+
+                    if (this.synth) {
+                        try { this.synth.triggerAttackRelease("C2", "16n"); } catch(e) {}
+                    }
+                }
+            }
+
+            update(delta) {
+                // Always render the 3D scene even before clicking start so the background preview looks alive
+                if (!this.isGameStarted) {
+                    this.renderer.render(this.scene, this.camera);
+                    return;
+                }
+
+                this.inGameTime += this.timeSpeed;
+                if (this.inGameTime >= 24.0) this.inGameTime = 0.0;
+                const hours = Math.floor(this.inGameTime);
+                const minutes = Math.floor((this.inGameTime - hours) * 60);
+                document.getElementById('clock-val').innerText = `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}`;
+
+                const isDaytime = hours >= 6 && hours < 19;
+
+                if (isDaytime) {
+                    this.scene.background.setHex(0x0284c7);
+                    this.scene.fog.color.setHex(0x0284c7);
+                    this.ambientLight.intensity = 1.2;
+                    this.dirLight.intensity = 1.5;
+                    if (this.moonMesh) this.moonMesh.visible = false;
+                } else if (hours >= 19 && hours < 21) {
+                    this.scene.background.setHex(0xc2410c);
+                    this.scene.fog.color.setHex(0xc2410c);
+                    this.ambientLight.intensity = 0.7;
+                    this.dirLight.intensity = 0.6;
+                } else {
+                    this.scene.background.setHex(0x020617);
+                    this.scene.fog.color.setHex(0x020617);
+                    this.ambientLight.intensity = 0.2;
+                    this.dirLight.intensity = 0.1;
+                    if (this.moonMesh) this.moonMesh.visible = true;
+
+                    if (hours >= 22 && !this.isDeerSpawned) {
+                        this.spawnGiantDeerHorde();
+                    }
+                }
+
+                let baseSpeed = 0.55;
+                let runMultiplier = 2.4;
+                if (this.player.isRunning) {
+                    if (this.player.stamina > 0) {
+                        this.player.stamina -= 0.12; 
+                        baseSpeed *= runMultiplier;
+                        if (this.player.stamina <= 0) {
+                            this.player.isRunning = false;
+                            const runBtn = document.getElementById('btn-run');
+                            runBtn.classList.remove('from-emerald-600', 'to-teal-600');
+                            runBtn.classList.add('from-blue-600', 'to-indigo-600');
+                        }
+                    }
+                } else {
+                    if (this.player.stamina < this.player.maxStamina) {
+                        this.player.stamina = Math.min(this.player.maxStamina, this.player.stamina + 0.35);
+                    }
+                }
+                document.getElementById('stamina-val').innerText = Math.floor(this.player.stamina);
+
+                if (this.player.isHoroning) baseSpeed = 0.1;
+                let moveForward = 0, moveRight = 0;
+
+                if (this.keys['KeyW'] || this.keys['ArrowUp']) moveForward += 1;
+                if (this.keys['KeyS'] || this.keys['ArrowDown']) moveForward -= 1;
+                if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveRight -= 1;
+                if (this.keys['KeyD'] || this.keys['ArrowRight']) moveRight += 1;
+
+                if (this.moveVector.x !== 0 || this.moveVector.z !== 0) {
+                    moveRight += this.moveVector.x;
+                    moveForward += -this.moveVector.z;
+                }
+
+                if (moveForward !== 0 || moveRight !== 0) {
+                    const len = Math.hypot(moveForward, moveRight);
+                    if (len > 0) {
+                        moveForward /= len;
+                        moveRight /= len;
+                    }
+
+                    const forwardX = Math.sin(this.cameraAngleX);
+                    const forwardZ = -Math.cos(this.cameraAngleX);
+                    const rightX = Math.cos(this.cameraAngleX);
+                    const rightZ = Math.sin(this.cameraAngleX);
+
+                    this.player.x += (forwardX * moveForward + rightX * moveRight) * baseSpeed;
+                    this.player.z += (forwardZ * moveForward + rightZ * moveRight) * baseSpeed;
+                }
+
+                if (this.player.isJumping) {
+                    this.player.y += this.player.jumpVal;
+                    this.player.jumpVal -= 0.03;
+                    if (this.player.y <= 2) {
+                        this.player.y = 2;
+                        this.player.isJumping = false;
+                    }
+                }
+
+                if (this.player.isHoroning) {
+                    this.cameraAngleX += 0.03;
+                }
+
+                if (this.player.cameraView === 'FIRST') {
+                    this.camera.position.set(this.player.x, this.player.y + 0.8, this.player.z);
+                    const lookX = this.player.x + Math.sin(this.cameraAngleX) * Math.cos(this.cameraAngleY) * 50;
+                    const lookY = (this.player.y + 0.8) + Math.sin(this.cameraAngleY) * 50;
+                    const lookZ = this.player.z - Math.cos(this.cameraAngleX) * Math.cos(this.cameraAngleY) * 50;
+                    this.camera.lookAt(lookX, lookY, lookZ);
+                    this.flashlight.position.copy(this.camera.position);
+                    this.flashlight.target.position.set(lookX, lookY, lookZ);
+                } else {
+                    const dist = 10;
+                    const cx = this.player.x - Math.sin(this.cameraAngleX) * dist;
+                    const cz = this.player.z + Math.cos(this.cameraAngleX) * dist;
+                    this.camera.position.set(cx, this.player.y + 5, cz);
+                    this.camera.lookAt(this.player.x, this.player.y, this.player.z);
+                    if (this.playerAvatar) {
+                        this.playerAvatar.position.set(this.player.x, this.player.y - 1.2, this.player.z);
+                        this.playerAvatar.rotation.y = this.cameraAngleX;
+                    }
+                }
+
+                for (let b of this.birds) {
+                    b.angle += 0.02;
+                    b.x += Math.cos(b.angle) * 0.4;
+                    b.z += Math.sin(b.angle) * 0.4;
+                    b.group.position.set(b.x, b.y, b.z);
+                }
+
+                for (let i = this.projectiles.length - 1; i >= 0; i--) {
+                    let pr = this.projectiles[i];
+                    pr.mesh.position.addScaledVector(pr.dir, 4.0);
+                    pr.life--;
+
+                    if (this.isDeerSpawned) {
+                        for (let deer of this.deerHorde) {
+                            if (pr.mesh.position.distanceTo(deer.group.position) < 8) {
+                                this.deerHp -= 30;
+                                const pct = Math.max(0, (this.deerHp / this.maxDeerHp) * 100);
+                                document.getElementById('deer-hp-bar').style.width = pct + '%';
+                                showNotification(`${i18n[this.currentLang].notifDeerHit} ${this.deerHp}`, "bg-amber-600");
+
+                                this.scene.remove(pr.mesh);
+                                this.projectiles.splice(i, 1);
+
+                                if (this.deerHp <= 0) {
+                                    this.deerHorde.forEach(d => this.scene.remove(d.group));
+                                    this.deerHorde = [];
+                                    this.isDeerSpawned = false;
+                                    document.getElementById('deer-hud').classList.add('hidden');
+                                    this.player.score += 5000;
+                                    showNotification(i18n[this.currentLang].notifDeerDead, "bg-emerald-600");
+                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if (pr.life <= 0) {
+                        this.scene.remove(pr.mesh);
+                        this.projectiles.splice(i, 1);
+                    }
+                }
+
+                const cf = this.campfires[0];
+                const distToFire = Math.hypot(this.player.x - cf.x, this.player.z - cf.z);
+                if (distToFire <= cf.radius) {
+                    if (this.player.hp < 100) this.player.hp = Math.min(100, this.player.hp + 0.15);
+                }
+                document.getElementById('hp-val').innerText = Math.floor(this.player.hp);
+
+                if (this.mother) {
+                    const mTargetX = this.isMotherChasing ? this.player.x : cf.x + 3;
+                    const mTargetZ = this.isMotherChasing ? this.player.z : cf.z + 3;
+                    const angleToTarget = Math.atan2(mTargetZ - this.mother.z, mTargetX - this.mother.x);
+                    this.mother.x += Math.cos(angleToTarget) * this.mother.speed;
+                    this.mother.z += Math.sin(angleToTarget) * this.mother.speed;
+                    this.mother.group.position.set(this.mother.x, 0, this.mother.z);
+
+                    if (Math.hypot(this.player.x - this.mother.x, this.player.z - this.mother.z) < 3.5) {
+                        this.player.hp -= 0.8;
+                        if (this.player.hp <= 0) triggerGameOver();
+                    }
+                }
+
+                for (let w of this.wolves) {
+                    const distToPlayer = Math.hypot(this.player.x - w.x, this.player.z - w.z);
+                    const distToFire = Math.hypot(w.x - cf.x, w.z - cf.z);
+
+                    let isIlluminated = false;
+                    if (distToFire < cf.radius + 18) {
+                        isIlluminated = true;
+                    }
+                    if (this.player.flashlightOn) {
+                        const angleToWolf = Math.atan2(w.z - this.player.z, w.x - this.player.x);
+                        let diffAngle = Math.abs(this.cameraAngleX - angleToWolf);
+                        if (diffAngle < Math.PI / 2.5 && distToPlayer < 90) {
+                            isIlluminated = true;
+                        }
+                    }
+
+                    if (isIlluminated) {
+                        const angleAway = Math.atan2(w.z - this.player.z, w.x - this.player.x);
+                        w.x += Math.cos(angleAway) * (w.speed * 2.8);
+                        w.z += Math.sin(angleAway) * (w.speed * 2.8);
+                    } else {
+                        const angleToPlayer = Math.atan2(this.player.z - w.z, this.player.x - w.x);
+                        w.x += Math.cos(angleToPlayer) * (w.isAlpha ? 1.5 : w.speed);
+                        w.z += Math.sin(angleToPlayer) * (w.isAlpha ? 1.5 : w.speed);
+
+                        if (distToPlayer < 4.5) {
+                            this.player.hp -= 0.9;
+                            if (this.player.hp <= 0) triggerGameOver();
+                        }
+                    }
+
+                    w.group.position.set(w.x, 0, w.z);
+                }
+
+                if (this.isDeerSpawned) {
+                    for (let deer of this.deerHorde) {
+                        const distToFire = Math.hypot(deer.x - cf.x, deer.z - cf.z);
+                        const distToPlayer = Math.hypot(this.player.x - deer.x, this.player.z - deer.z);
+                        let deerIlluminated = distToFire < cf.radius + 20 || (this.player.flashlightOn && distToPlayer < 70);
+
+                        if (deerIlluminated || isDaytime) {
+                            const angleAway = Math.atan2(deer.z - this.player.z, deer.x - this.player.x);
+                            deer.x += Math.cos(angleAway) * deer.speed * 2.5;
+                            deer.z += Math.sin(angleAway) * deer.speed * 2.5;
+                        } else {
+                            const angleToPlayer = Math.atan2(this.player.z - deer.z, this.player.x - deer.x);
+                            deer.x += Math.cos(angleToPlayer) * deer.speed;
+                            deer.z += Math.sin(angleToPlayer) * deer.speed;
+
+                            if (distToPlayer < 6.0) {
+                                this.player.hp -= 1.0;
+                                if (this.player.hp <= 0) triggerGameOver();
+                            }
+                        }
+                        deer.group.position.set(deer.x, 0, deer.z);
+                    }
+                }
+
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        let notifTimeout = null;
+        function showNotification(text, colorClass) {
+            const el = document.getElementById('notification');
+            el.innerText = text;
+            el.className = `self-center text-center px-5 py-1.5 text-white font-black text-xs rounded-2xl shadow-2xl transition-all duration-300 border border-white/40 ${colorClass}`;
+            el.classList.remove('opacity-0', 'scale-95');
+            if (notifTimeout) clearTimeout(notifTimeout);
+            notifTimeout = setTimeout(() => {
+                el.classList.add('opacity-0', 'scale-95');
+            }, 3000);
+        }
+
+        function triggerMotherQuote(quote) {
+            const hud = document.getElementById('mother-hud');
+            const txt = document.getElementById('mother-text');
+            txt.innerText = `"${quote}"`;
+            hud.classList.remove('hidden');
+            speakMother(quote);
+            setTimeout(() => {
+                hud.classList.add('hidden');
+            }, 4000);
+        }
+
+        function triggerGameOver() {
+            game.isGameStarted = false;
+            document.getElementById('final-score').innerText = game.player.score;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            triggerMotherQuote("Ateşten ve fener ışığından uzaklaştın uşağum!");
+        }
+
+        function restartGame() {
+            location.reload();
+        }
+
+        window.onload = function() {
+            game = new Game3D();
+            function animateLoop() {
+                requestAnimationFrame(animateLoop);
+                game.update(0.016);
+            }
+            animateLoop();
+        };
+    </script>
+</body>
+</html>
